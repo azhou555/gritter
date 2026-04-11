@@ -170,3 +170,28 @@ class TestRustASTChunker:
         content = rust_fixture_path.read_text()
         chunks = chunk_file_ast(content, str(rust_fixture_path), "rust")
         assert any("impl" in c.content for c in chunks)
+
+
+def test_dispatcher_routes_python_to_ast(python_fixture_path):
+    from gritter.indexing.chunker import chunk_file
+    content = python_fixture_path.read_text()
+    chunks = chunk_file(content, str(python_fixture_path), "python")
+    assert any(c.symbol_type == "function" for c in chunks)
+
+
+def test_dispatcher_routes_unknown_to_heuristic():
+    from gritter.indexing.chunker import chunk_file
+    content = "func main() {\n    fmt.Println(\"hello\")\n}\n\nfunc add(a, b int) int {\n    return a + b\n}\n"
+    chunks = chunk_file(content, "main.go", "go")
+    assert len(chunks) >= 1
+    assert all(c.symbol_type == "module" for c in chunks)
+
+
+def test_dispatcher_falls_back_to_heuristic_on_parse_error():
+    from gritter.indexing.chunker import chunk_file
+    # Python file with a syntax error — should fall back gracefully
+    bad_content = "def foo(:\n    pass\n"
+    chunks = chunk_file(bad_content, "broken.py", "python")
+    # Should not raise, should return at least one chunk
+    assert len(chunks) >= 1
+    assert all(c.symbol_type == "module" for c in chunks)
