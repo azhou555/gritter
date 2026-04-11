@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 from pathlib import Path
 
 from gritter.utils.languages import (
@@ -17,30 +18,37 @@ def discover_files(
     exclude_globs = exclude_globs or []
     results: list[tuple[Path, str]] = []
 
-    for path in root.rglob("*"):
-        if not path.is_file():
-            continue
+    for dirpath, dirnames, filenames in os.walk(root, topdown=True):
+        current = Path(dirpath)
 
-        # Skip hidden directories and known excluded dirs
-        parts = path.relative_to(root).parts
-        if any(part.startswith(".") or part in EXCLUDED_DIRS for part in parts[:-1]):
-            continue
+        # Prune excluded and hidden directories in-place to avoid descending into them
+        dirnames[:] = [
+            d for d in dirnames
+            if not d.startswith(".") and d not in EXCLUDED_DIRS
+        ]
 
-        # Skip excluded filenames
-        if path.name in EXCLUDED_FILENAMES:
-            continue
+        for filename in filenames:
+            path = current / filename
 
-        # Skip excluded extensions
-        if path.suffix.lower() in EXCLUDED_EXTENSIONS:
-            continue
+            # Skip hidden files
+            if filename.startswith("."):
+                continue
 
-        # Skip user-configured glob patterns
-        rel = path.relative_to(root)
-        if any(rel.match(g) for g in exclude_globs):
-            continue
+            # Skip excluded filenames
+            if filename in EXCLUDED_FILENAMES:
+                continue
 
-        language = detect_language(str(path))
-        if language is not None:
-            results.append((path, language))
+            # Skip excluded extensions
+            if path.suffix.lower() in EXCLUDED_EXTENSIONS:
+                continue
+
+            # Skip user-configured glob patterns
+            rel = path.relative_to(root)
+            if any(rel.match(g) for g in exclude_globs):
+                continue
+
+            language = detect_language(str(path))
+            if language is not None:
+                results.append((path, language))
 
     return results

@@ -62,3 +62,14 @@ def test_discover_files_skips_lockfiles(tmp_path):
     paths = {p.name for p, _ in results}
     assert "app.ts" in paths
     assert "package-lock.json" not in paths
+
+
+def test_discover_files_skips_hidden_files(tmp_path):
+    (tmp_path / ".env").write_text("SECRET=abc")
+    (tmp_path / ".hidden.py").write_text("x = 1")
+    (tmp_path / "visible.py").write_text("y = 2")
+    results = discover_files(tmp_path)
+    paths = {p.name for p, _ in results}
+    assert "visible.py" in paths
+    assert ".hidden.py" not in paths
+    assert ".env" not in paths

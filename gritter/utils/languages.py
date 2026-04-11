@@ -26,7 +26,7 @@ EXCLUDED_EXTENSIONS: set[str] = {
     ".pyc", ".pyo", ".pyd", ".so", ".dylib", ".dll", ".exe",
     ".jpg", ".jpeg", ".png", ".gif", ".svg", ".ico", ".webp",
     ".pdf", ".zip", ".tar", ".gz", ".whl", ".egg",
-    ".lock", ".min.js", ".map",
+    ".lock", ".map",
 }
 
 
