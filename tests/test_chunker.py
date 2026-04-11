@@ -64,6 +64,8 @@ def bar():
     y = 2
     return y
 """
+    # min_tokens=1 isolates splitting behavior from the merge guardrail —
+    # the blocks are short (~13 tokens each) so the default min_tokens=50 would merge them.
     chunks = chunk_file_heuristic(content, "test.go", "go", min_tokens=1)
     assert len(chunks) == 2
     assert "def foo" in chunks[0].content

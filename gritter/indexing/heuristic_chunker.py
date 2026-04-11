@@ -85,8 +85,11 @@ def _apply_guardrails(
     for content, start, end in block_with_lines:
         if count_tokens(content) > max_tokens:
             parts = split_at_token_boundary(content, max_tokens, overlap_tokens)
+            line_offset = start
             for part in parts:
-                expanded.append((part, start, end))  # approximate line numbers for splits
+                part_line_count = part.count("\n") + 1
+                expanded.append((part, line_offset, line_offset + part_line_count - 1))
+                line_offset += part_line_count
         else:
             expanded.append((content, start, end))
 
@@ -98,6 +101,12 @@ def _apply_guardrails(
             merged[-1] = (prev_content + "\n\n" + content, prev_start, end)
         else:
             merged.append((content, start, end))
+
+    # Post-merge: absorb any trailing small block into the preceding one
+    if len(merged) >= 2 and count_tokens(merged[-1][0]) < min_tokens:
+        last_content, last_start, last_end = merged.pop()
+        prev_content, prev_start, prev_end = merged[-1]
+        merged[-1] = (prev_content + "\n\n" + last_content, prev_start, last_end)
 
     return [
         CodeChunk(
