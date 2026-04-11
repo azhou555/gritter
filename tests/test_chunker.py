@@ -1,6 +1,7 @@
 import pytest
 from gritter.models.chunk import CodeChunk
 from gritter.indexing.heuristic_chunker import chunk_file_heuristic
+from gritter.indexing.ast_chunker import chunk_file_ast
 
 
 def test_chunk_id_is_deterministic():
@@ -104,8 +105,6 @@ def test_heuristic_chunker_populates_metadata():
     assert chunks[0].start_line == 1
 
 
-from gritter.indexing.ast_chunker import chunk_file_ast
-
 
 class TestPythonASTChunker:
     def test_extracts_top_level_functions(self, python_fixture_path):
@@ -120,10 +119,7 @@ class TestPythonASTChunker:
         content = python_fixture_path.read_text()
         chunks = chunk_file_ast(content, str(python_fixture_path), "python")
         class_or_method_chunks = [c for c in chunks if c.symbol_type in ("class", "method")]
-        assert any(
-            c.symbol_name == "Calculator" or (c.symbol_name and "Calculator" in c.symbol_name)
-            for c in class_or_method_chunks
-        )
+        assert any(c.symbol_name == "Calculator" for c in class_or_method_chunks)
 
     def test_chunk_line_numbers_are_correct(self, python_fixture_path):
         content = python_fixture_path.read_text()

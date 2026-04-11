@@ -221,22 +221,21 @@ def _split_large_node(
     if not methods:
         node_text = source[node.start_byte:node.end_byte].decode("utf-8")
         parts = split_at_token_boundary(node_text, max_tokens, overlap_tokens)
-        result = []
-        line_offset = node.start_point[0] + 1
-        for part in parts:
-            part_lines = part.count("\n") + 1
-            result.append(CodeChunk(
+        node_start = node.start_point[0] + 1
+        node_end = node.end_point[0] + 1
+        return [
+            CodeChunk(
                 content=part,
                 file_path=file_path,
                 language=language,
                 symbol_name=parent_name,
                 symbol_type="module",
-                start_line=line_offset,
-                end_line=line_offset + part_lines - 1,
+                start_line=node_start,
+                end_line=node_end,
                 imports=imports,
-            ))
-            line_offset += part_lines
-        return result
+            )
+            for part in parts
+        ]
 
     chunks: list[CodeChunk] = []
     for method in methods:
