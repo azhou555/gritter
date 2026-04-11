@@ -1,4 +1,4 @@
-# Codebase RAG CLI — Design Spec
+# Gritter RAG CLI — Design Spec
 
 **Date:** 2026-04-10
 **Status:** Approved
@@ -15,12 +15,12 @@ A command-line tool that ingests any codebase, builds a searchable index using c
 
 - Demonstrate production-grade RAG engineering: AST-based chunking, hybrid retrieval, reciprocal rank fusion, multi-provider embeddings and LLMs
 - Function as a genuinely useful daily tool for querying unfamiliar codebases
-- Publishable to PyPI (`pip install coderag`)
+- Publishable to PyPI (`pip install gritter`)
 
 ## Non-Goals (v1)
 
 - Cross-encoder re-ranking (interface stubbed, implementation deferred to v1.1)
-- Evaluation harness (`coderag eval`)
+- Evaluation harness (`gritter eval`)
 - Incremental indexing via git diff
 - Multi-repo support
 - Web UI
@@ -131,7 +131,7 @@ Two stores written in parallel:
 
 **BM25 index** (`rank_bm25`) — receives tokenized chunk content. Persisted to disk as a pickle alongside a positional map so chunk IDs can be recovered from BM25 rank positions.
 
-**Index metadata file** (JSON) — records: provider + model used, embedding dimension, number of files/chunks, languages seen, timestamp, config snapshot. Read by `coderag status`. Validates provider compatibility on subsequent queries: mismatched provider or dimension raises a clear error with an explicit re-index instruction.
+**Index metadata file** (JSON) — records: provider + model used, embedding dimension, number of files/chunks, languages seen, timestamp, config snapshot. Read by `gritter status`. Validates provider compatibility on subsequent queries: mismatched provider or dimension raises a clear error with an explicit re-index instruction.
 
 Progress displayed via Rich progress bar (chunks processed / total with ETA).
 
@@ -217,17 +217,17 @@ After stream completes, file path references (`src/auth/jwt.py:L15-45`) are pars
 
 ### Chat Mode
 
-`coderag chat` maintains a `messages` list in memory across turns. Each turn re-runs retrieval against the new query — conversation history is passed to the LLM but does not influence retrieval. Multi-turn query rewriting is deferred to v2.
+`gritter chat` maintains a `messages` list in memory across turns. Each turn re-runs retrieval against the new query — conversation history is passed to the LLM but does not influence retrieval. Multi-turn query rewriting is deferred to v2.
 
 ---
 
 ## Configuration
 
-**Load priority:** CLI flags → environment variables → `.coderagrc` (TOML, project root or `~/.config/coderag/config.toml`) → defaults
+**Load priority:** CLI flags → environment variables → `.gritterrc` (TOML, project root or `~/.config/gritter/config.toml`) → defaults
 
 **API keys:** read from environment variables only — never written to config files.
 
-**`coderag config set <key> <value>`** writes to user-level config file.
+**`gritter config set <key> <value>`** writes to user-level config file.
 
 Key config fields:
 - `embedding.provider` — `voyage` | `openai` | `local`
@@ -247,12 +247,12 @@ Key config fields:
 
 | Command | Description |
 |---|---|
-| `coderag index <path>` | Index a local directory. Runs full indexing pipeline with Rich progress bar. |
-| `coderag ask "<question>"` | Single query. Streams answer, prints Sources block. |
-| `coderag chat` | Interactive REPL for multi-turn queries. |
-| `coderag status` | Reads index metadata. Prints table: files, chunks, languages, provider, last indexed. |
-| `coderag config set <key> <value>` | Write a config value to user-level config file. |
-| `coderag config show` | Print current effective configuration. |
+| `gritter index <path>` | Index a local directory. Runs full indexing pipeline with Rich progress bar. |
+| `gritter ask "<question>"` | Single query. Streams answer, prints Sources block. |
+| `gritter chat` | Interactive REPL for multi-turn queries. |
+| `gritter status` | Reads index metadata. Prints table: files, chunks, languages, provider, last indexed. |
+| `gritter config set <key> <value>` | Write a config value to user-level config file. |
+| `gritter config show` | Print current effective configuration. |
 
 ---
 
@@ -264,14 +264,14 @@ Key config fields:
 | Provider/dimension mismatch on existing index | Error with explicit re-index instruction |
 | File with syntax errors | Warning logged, file falls back to `HeuristicChunker`, indexing continues |
 | LLM context window exceeded | Trim lowest-scoring chunks until prompt fits, warn user |
-| ChromaDB/BM25 store missing or corrupt | Error with instruction to re-run `coderag index` |
+| ChromaDB/BM25 store missing or corrupt | Error with instruction to re-run `gritter index` |
 
 ---
 
 ## Project Structure
 
 ```
-coderag/
+gritter/
 ├── cli/
 │   ├── main.py             # Typer app, top-level commands
 │   ├── index_cmd.py
@@ -333,9 +333,9 @@ coderag/
 - Assert: RRF produces different ordering than dense-only or sparse-only; `NoOpReranker` returns results unchanged
 
 **End-to-end tests (real API, gated):**
-- Gated behind `CODERAG_RUN_E2E_TESTS=1`
+- Gated behind `GRITTER_RUN_E2E_TESTS=1`
 - Index a fixture project, run a query, assert non-empty response with at least one valid citation
-- `coderag status` reflects correct counts post-index
+- `gritter status` reflects correct counts post-index
 
 ---
 
@@ -357,10 +357,10 @@ coderag/
 
 ## Development Milestones
 
-**Week 1:** Chunking engine — tree-sitter setup, AST chunker for Python/TypeScript/Rust, heuristic fallback, file discovery, unit tests
+**Sprint 1:** Chunking engine — tree-sitter setup, AST chunker for Python/TypeScript/Rust, heuristic fallback, file discovery, unit tests
 
-**Week 2:** Indexing + storage — embedding providers, ChromaDB + BM25 storage, `coderag index` and `coderag status` commands, test on a real repo
+**Sprint 2:** Indexing + storage — embedding providers, ChromaDB + BM25 storage, `gritter index` and `gritter status` commands, test on a real repo
 
-**Week 3:** Retrieval + generation — dense/sparse retrieval, RRF fusion, reranker stub, prompt construction, LLM streaming, `coderag ask` and `coderag chat`
+**Sprint 3:** Retrieval + generation — dense/sparse retrieval, RRF fusion, reranker stub, prompt construction, LLM streaming, `gritter ask` and `gritter chat`
 
-**Week 4:** Polish — configuration system, Rich terminal output, README with demo, basic end-to-end tests, PyPI packaging
+**Sprint 4:** Polish — configuration system, Rich terminal output, README with demo, basic end-to-end tests, PyPI packaging
