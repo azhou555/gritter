@@ -16,7 +16,7 @@ class CodeChunk:
     chunk_id: str = field(init=False)
 
     def __post_init__(self) -> None:
-        raw = f"{self.file_path}:{self.content}"
+        raw = f"{self.file_path}:{self.start_line}:{self.content}"
         self.chunk_id = hashlib.sha256(raw.encode()).hexdigest()[:16]
 
     def embedding_text(self) -> str:

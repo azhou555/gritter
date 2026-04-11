@@ -11,6 +11,10 @@ def count_tokens(text: str) -> int:
 
 def split_at_token_boundary(text: str, max_tokens: int, overlap_tokens: int) -> list[str]:
     """Split text into chunks of at most max_tokens with overlap_tokens overlap."""
+    if overlap_tokens >= max_tokens:
+        raise ValueError(
+            f"overlap_tokens ({overlap_tokens}) must be less than max_tokens ({max_tokens})"
+        )
     tokens = _enc.encode(text)
     if len(tokens) <= max_tokens:
         return [text]
