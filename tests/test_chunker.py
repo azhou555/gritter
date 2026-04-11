@@ -64,7 +64,7 @@ def bar():
     y = 2
     return y
 """
-    chunks = chunk_file_heuristic(content, "test.go", "go")
+    chunks = chunk_file_heuristic(content, "test.go", "go", min_tokens=1)
     assert len(chunks) == 2
     assert "def foo" in chunks[0].content
     assert "def bar" in chunks[1].content

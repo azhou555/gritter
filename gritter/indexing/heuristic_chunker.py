@@ -7,7 +7,7 @@ def chunk_file_heuristic(
     content: str,
     file_path: str,
     language: str,
-    min_tokens: int = 5,
+    min_tokens: int = 50,
     max_tokens: int = 512,
     overlap_tokens: int = 20,
 ) -> list[CodeChunk]:
