@@ -1,0 +1,10 @@
+{"query": "How does file discovery work and which directories are excluded?", "relevant_files": ["gritter/indexing/discovery.py", "gritter/utils/languages.py"]}
+{"query": "How are code files split into chunks?", "relevant_files": ["gritter/indexing/chunker.py", "gritter/indexing/heuristic_chunker.py", "gritter/indexing/ast_chunker.py"]}
+{"query": "How does the hybrid retrieval pipeline combine dense and sparse search?", "relevant_files": ["gritter/retrieval/hybrid.py", "gritter/retrieval/fusion.py"]}
+{"query": "How are embeddings generated and which providers are supported?", "relevant_files": ["gritter/providers/embeddings.py"]}
+{"query": "How is the LLM response streamed and how is chat history maintained?", "relevant_files": ["gritter/generation/generator.py"]}
+{"query": "How are citations extracted from the LLM response?", "relevant_files": ["gritter/generation/citations.py"]}
+{"query": "How is the BM25 index built and persisted to disk?", "relevant_files": ["gritter/storage/bm25_store.py"]}
+{"query": "How does the indexing pipeline orchestrate discovery, chunking, and embedding?", "relevant_files": ["gritter/indexing/pipeline.py"]}
+{"query": "How are incremental index updates handled when files change?", "relevant_files": ["gritter/indexing/incremental.py", "gritter/indexing/pipeline.py"]}
+{"query": "How is a GitHub repo cloned and cached for indexing?", "relevant_files": ["gritter/indexing/github.py"]}
