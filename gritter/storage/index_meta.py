@@ -20,6 +20,7 @@ class IndexMeta:
         file_count: int,
         chunk_count: int,
         languages: list[str],
+        indexed_commit: str | None = None,
     ) -> None:
         self._data = {
             "embedding_provider": embedding_provider,
@@ -29,6 +30,7 @@ class IndexMeta:
             "chunk_count": chunk_count,
             "languages": sorted(languages),
             "indexed_at": datetime.now(timezone.utc).isoformat(),
+            "indexed_commit": indexed_commit,
         }
         self._path.parent.mkdir(parents=True, exist_ok=True)
         self._path.write_text(json.dumps(self._data, indent=2))

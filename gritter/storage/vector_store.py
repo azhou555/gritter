@@ -63,6 +63,27 @@ class VectorStore:
             chunks_and_scores.append((chunk, float(dist)))
         return chunks_and_scores
 
+    def delete_by_file_path(self, file_path: str) -> None:
+        """Delete all chunks whose file_path metadata matches."""
+        self._collection.delete(where={"file_path": file_path})
+
+    def get_all(self) -> list[CodeChunk]:
+        """Return all stored chunks (no embeddings). Used for BM25 rebuild."""
+        result = self._collection.get(include=["documents", "metadatas"])
+        chunks: list[CodeChunk] = []
+        for doc, meta in zip(result["documents"], result["metadatas"]):
+            chunks.append(CodeChunk(
+                content=doc,
+                file_path=meta["file_path"],
+                language=meta["language"],
+                symbol_name=meta["symbol_name"] or None,
+                symbol_type=meta["symbol_type"] or None,
+                start_line=int(meta["start_line"]),
+                end_line=int(meta["end_line"]),
+                imports=meta["imports"].split("\n") if meta["imports"] else [],
+            ))
+        return chunks
+
     def count(self) -> int:
         return self._collection.count()
 
