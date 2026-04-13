@@ -1,11 +1,15 @@
 # tests/test_retrieval.py
+from unittest.mock import MagicMock, patch
+
+import numpy as np
+
 from gritter.models.chunk import CodeChunk
 from gritter.models.query import RetrievalResult
 from gritter.retrieval.fusion import reciprocal_rank_fusion
-from gritter.retrieval.reranker import NoOpReranker
+from gritter.retrieval.reranker import CrossEncoderReranker, NoOpReranker
 
 
-def make_chunk(chunk_id_suffix: str, content: str = "some code") -> CodeChunk:
+def make_chunk(chunk_id_suffix: str, content: str = "some code", **kwargs) -> CodeChunk:
     chunk = CodeChunk(
         content=content,
         file_path="src/foo.py",
@@ -20,8 +24,8 @@ def make_chunk(chunk_id_suffix: str, content: str = "some code") -> CodeChunk:
     return chunk
 
 
-def make_result(chunk_id_suffix: str, score: float) -> RetrievalResult:
-    return RetrievalResult(chunk=make_chunk(chunk_id_suffix), score=score)
+def make_result(chunk_id_suffix: str, score: float, content: str = "some code") -> RetrievalResult:
+    return RetrievalResult(chunk=make_chunk(chunk_id_suffix, content=content), score=score)
 
 
 class TestRRF:
@@ -65,3 +69,52 @@ class TestNoOpReranker:
         reranker = NoOpReranker()
         reranked = reranker.rerank("some query", results)
         assert reranked == results
+
+
+class TestCrossEncoderReranker:
+    def _make_reranker_with_mock(self, scores: list[float]) -> CrossEncoderReranker:
+        """Return a CrossEncoderReranker whose underlying model is mocked."""
+        mock_model = MagicMock()
+        mock_model.predict.return_value = np.array(scores)
+        reranker = CrossEncoderReranker.__new__(CrossEncoderReranker)
+        reranker._model = mock_model
+        return reranker
+
+    def test_reranks_by_score_descending(self):
+        # Three results — mock model scores them in reverse order
+        results = [make_result("a", 0.9), make_result("b", 0.8), make_result("c", 0.7)]
+        reranker = self._make_reranker_with_mock([0.1, 0.5, 0.9])
+
+        reranked = reranker.rerank("query", results)
+
+        # Highest model score (0.9 → chunk "c") should be first
+        assert reranked[0].chunk.chunk_id == "chunk_c"
+        assert reranked[1].chunk.chunk_id == "chunk_b"
+        assert reranked[2].chunk.chunk_id == "chunk_a"
+
+    def test_scores_updated_to_cross_encoder_scores(self):
+        results = [make_result("x", 1.0), make_result("y", 0.5)]
+        reranker = self._make_reranker_with_mock([0.3, 0.8])
+
+        reranked = reranker.rerank("query", results)
+
+        assert abs(reranked[0].score - 0.8) < 1e-6  # chunk_y is first
+        assert abs(reranked[1].score - 0.3) < 1e-6
+
+    def test_empty_results_returned_unchanged(self):
+        reranker = self._make_reranker_with_mock([])
+        assert reranker.rerank("query", []) == []
+
+    def test_predict_called_with_query_content_pairs(self):
+        results = [make_result("a", 1.0, content="def foo(): pass")]
+        mock_model = MagicMock()
+        mock_model.predict.return_value = np.array([0.7])
+
+        reranker = CrossEncoderReranker.__new__(CrossEncoderReranker)
+        reranker._model = mock_model
+
+        reranker.rerank("how does foo work?", results)
+
+        mock_model.predict.assert_called_once_with(
+            [("how does foo work?", "def foo(): pass")]
+        )

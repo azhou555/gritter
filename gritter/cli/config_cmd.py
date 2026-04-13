@@ -25,6 +25,8 @@ _VALID_KEYS = {
     "index.chunk_overlap_tokens",
     "retrieval.top_k",
     "retrieval.candidate_k",
+    "reranker.provider",
+    "reranker.model",
 }
 
 
@@ -101,6 +103,8 @@ def config_show() -> None:
         "index.chunk_overlap_tokens": str(config.index.chunk_overlap_tokens),
         "retrieval.top_k": str(config.retrieval.top_k),
         "retrieval.candidate_k": str(config.retrieval.candidate_k),
+        "reranker.provider": config.reranker.provider,
+        "reranker.model": config.reranker.model or "(default)",
         "data_dir": str(config.data_dir),
     }
 

@@ -31,6 +31,11 @@ class IndexConfig(BaseModel):
     exclude_globs: list[str] = Field(default_factory=list)
 
 
+class RerankerConfig(BaseModel):
+    provider: Literal["cross-encoder", "none"] = "none"
+    model: str | None = None
+
+
 class RetrievalConfig(BaseModel):
     top_k: int = 5
     candidate_k: int = 20
@@ -41,6 +46,7 @@ class GritterConfig(BaseSettings):
     llm: LLMConfig = Field(default_factory=LLMConfig)
     index: IndexConfig = Field(default_factory=IndexConfig)
     retrieval: RetrievalConfig = Field(default_factory=RetrievalConfig)
+    reranker: RerankerConfig = Field(default_factory=RerankerConfig)
     data_dir: Path = Field(
         default_factory=lambda: Path.home() / ".local" / "share" / "gritter"
     )

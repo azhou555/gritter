@@ -7,7 +7,7 @@ from gritter.providers.embeddings import EmbeddingProvider, get_embedding_provid
 from gritter.retrieval.dense import dense_search
 from gritter.retrieval.sparse import sparse_search
 from gritter.retrieval.fusion import reciprocal_rank_fusion
-from gritter.retrieval.reranker import Reranker, NoOpReranker
+from gritter.retrieval.reranker import Reranker, NoOpReranker, CrossEncoderReranker
 from gritter.storage.vector_store import VectorStore
 from gritter.storage.bm25_store import BM25Store
 from gritter.storage.index_meta import IndexMeta
@@ -61,9 +61,17 @@ class HybridRetriever:
             embed_provider.dimension,
         )
 
+        if config.reranker.provider == "cross-encoder":
+            reranker: Reranker = CrossEncoderReranker(
+                config.reranker.model or "cross-encoder/ms-marco-MiniLM-L-12-v2"
+            )
+        else:
+            reranker = NoOpReranker()
+
         return cls(
             index_dir=index_dir,
             embed_provider=embed_provider,
+            reranker=reranker,
             candidate_k=config.retrieval.candidate_k,
             top_k=config.retrieval.top_k,
         )
