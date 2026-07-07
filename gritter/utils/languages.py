@@ -14,6 +14,7 @@ EXCLUDED_DIRS: set[str] = {
     "dist", "build", "target", ".next", ".nuxt", ".cache",
     "venv", ".venv", "env", ".env", ".tox",
     "coverage", ".coverage", ".mypy_cache", ".ruff_cache",
+    "tests", "test", "spec", "__tests__",
 }
 
 EXCLUDED_FILENAMES: set[str] = {

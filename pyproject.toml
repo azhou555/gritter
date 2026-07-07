@@ -37,6 +37,7 @@ dependencies = [
     "openai>=1.0",
     "voyageai>=0.3",
     "sentence-transformers>=3",
+    "einops>=0.7",
     "tiktoken>=0.7",
     "tomli-w>=1",
 ]

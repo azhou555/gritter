@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 import typer
 from rich.live import Live
 from rich.text import Text
@@ -14,13 +15,14 @@ from gritter.utils.display import console, print_error
 
 
 def chat(
-    name: str = typer.Option("default", "--name", "-n", help="Index name to query"),
+    name: str = typer.Option(None, "--name", "-n", help="Index name to query (defaults to current directory name)"),
 ) -> None:
     """Interactive multi-turn chat about an indexed codebase."""
     config = GritterConfig()
+    index_name = name or Path.cwd().name
 
     try:
-        retriever = HybridRetriever.from_config(name, config)
+        retriever = HybridRetriever.from_config(index_name, config)
     except (ValueError, FileNotFoundError) as exc:
         print_error(str(exc))
         raise typer.Exit(1)
@@ -34,7 +36,7 @@ def chat(
     gen = Generator(llm)
 
     console.print(
-        f"\n[bold]Gritter chat[/bold] — index: [cyan]{name}[/cyan]  "
+        f"\n[bold]Gritter chat[/bold] — index: [cyan]{index_name}[/cyan]  "
         "[dim](type 'exit' or press Ctrl+C to quit)[/dim]\n"
     )
 

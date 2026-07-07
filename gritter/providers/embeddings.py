@@ -67,9 +67,22 @@ class LocalEmbedder(EmbeddingProvider):
     """sentence-transformers — runs locally, no API key required."""
 
     def __init__(self, model: str = "nomic-ai/nomic-embed-text-v1") -> None:
+        import contextlib
+        import io
+        import logging
+        import warnings
         from sentence_transformers import SentenceTransformer
-        self._model = SentenceTransformer(model, trust_remote_code=True)
-        self._dimension = self._model.get_sentence_embedding_dimension()
+
+        # Suppress noisy HuggingFace/transformers startup logs and prints.
+        # tqdm download bars write to stderr, so redirecting stdout is safe.
+        logging.getLogger("transformers").setLevel(logging.ERROR)
+        logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
+
+        with warnings.catch_warnings(), contextlib.redirect_stdout(io.StringIO()):
+            warnings.filterwarnings("ignore", message=".*rope_parameters.*")
+            self._model = SentenceTransformer(model, trust_remote_code=True)
+
+        self._dimension = self._model.get_embedding_dimension()
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         return self._model.encode(texts, convert_to_numpy=True).tolist()

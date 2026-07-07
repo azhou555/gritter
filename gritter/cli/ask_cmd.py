@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 import typer
 from rich.live import Live
 from rich.text import Text
@@ -15,16 +16,17 @@ from gritter.utils.display import console, print_error
 
 def ask(
     question: str = typer.Argument(..., help="Natural language question about the codebase"),
-    name: str = typer.Option("default", "--name", "-n", help="Index name to query"),
+    name: str = typer.Option(None, "--name", "-n", help="Index name to query (defaults to current directory name)"),
     top_k: int = typer.Option(None, "--top-k", help="Number of results to retrieve"),
 ) -> None:
     """Ask a question about an indexed codebase."""
     config = GritterConfig()
+    index_name = name or Path.cwd().name
     if top_k is not None:
         config.retrieval.top_k = top_k
 
     try:
-        retriever = HybridRetriever.from_config(name, config)
+        retriever = HybridRetriever.from_config(index_name, config)
     except (ValueError, FileNotFoundError) as exc:
         print_error(str(exc))
         raise typer.Exit(1)
