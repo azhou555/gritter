@@ -28,9 +28,17 @@ def ask(
 
     try:
         retriever = HybridRetriever.from_config(index_name, config)
-        source_root = IndexMeta(config.index_dir(index_name)).read()["source_root"]
+        meta = IndexMeta(config.index_dir(index_name)).read()
     except (ValueError, FileNotFoundError) as exc:
         print_error(str(exc))
+        raise typer.Exit(1)
+
+    source_root = meta.get("source_root")
+    if source_root is None:
+        print_error(
+            f"Index '{index_name}' was built with an older version of gritter and has no "
+            "recorded source path. Re-run `gritter index` to rebuild it."
+        )
         raise typer.Exit(1)
 
     try:
