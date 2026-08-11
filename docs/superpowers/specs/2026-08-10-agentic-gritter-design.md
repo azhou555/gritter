@@ -15,7 +15,7 @@ Replace gritter's fixed retrieve-then-generate pipeline with an agentic tool-cal
 
 - Let the model recover from a bad initial retrieval by searching again, reading a full file, or grepping for a symbol, instead of answering from a single fixed top-k.
 - Close the existing citation-trust gap (`DESIGN.md`: citations are regex-extracted and never checked against real files) using the same file-access tools the agent now has.
-- Ship through the existing PyPI trusted-publishing pipeline as `0.2.0`.
+- Ship through the existing PyPI trusted-publishing pipeline as `1.0.0`.
 
 ## Non-Goals
 
@@ -138,5 +138,5 @@ Follows existing style (`tests/test_generation.py`, `tests/test_retrieval.py`): 
 
 1. Implement + tests green.
 2. Manual smoke test: `gritter ask` against gritter's own repo, confirm tool calls fire and citations verify.
-3. Bump `pyproject.toml` version to `0.2.0`.
-4. `git tag v0.2.0 && git push --tags` — triggers existing `publish.yml` trusted-publishing workflow (no new PyPI setup required; `gritter` 0.1.0 is already live).
+3. Bump `pyproject.toml` version to `1.0.0`.
+4. `git tag v1.0.0 && git push --tags` — triggers existing `publish.yml` trusted-publishing workflow (no new PyPI setup required; `gritter` 0.1.0 is already live). Note: a local `v1.0.0` tag already exists from a prior session and was never pushed — verify it isn't pointing at unrelated work before reusing it, or delete/replace it once this is ready to tag.
