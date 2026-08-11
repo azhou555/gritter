@@ -99,13 +99,22 @@ def dispatch_tool(ctx: ToolContext, name: str, arguments: dict) -> str:
         return f"Error: {exc}"
 
 
+_MAX_TOOL_OUTPUT_CHARS = 8000
+
+
+def _truncate(text: str, max_chars: int = _MAX_TOOL_OUTPUT_CHARS) -> str:
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars] + "\n… [truncated]"
+
+
 def tool_search_code(ctx: ToolContext, query: str, top_k: int | None = None) -> str:
     results = ctx.retriever.search(query)
     if top_k is not None:
         results = results[:top_k]
     if not results:
         return "No results found."
-    return "\n\n".join(build_context_block(r) for r in results)
+    return _truncate("\n\n".join(build_context_block(r) for r in results))
 
 
 def _resolve_path(repo_root: Path, path: str) -> Path:
@@ -126,7 +135,7 @@ def tool_read_file(
     start = max(1, start_line or 1)
     end = min(len(lines), end_line or len(lines))
     numbered = "\n".join(f"{i}: {lines[i - 1]}" for i in range(start, end + 1))
-    return f"--- {path} (lines {start}-{end}) ---\n{numbered}"
+    return _truncate(f"--- {path} (lines {start}-{end}) ---\n{numbered}")
 
 
 def tool_grep(ctx: ToolContext, pattern: str, path_glob: str | None = None) -> str:
@@ -136,25 +145,30 @@ def tool_grep(ctx: ToolContext, pattern: str, path_glob: str | None = None) -> s
 
 
 def _grep_ripgrep(repo_root: Path, pattern: str, path_glob: str | None) -> str:
-    args = ["rg", "--line-number", "--no-heading", "--max-count", "5", pattern]
+    args = ["rg", "--line-number", "--no-heading", "--max-count", "5"]
     if path_glob:
         args += ["--glob", path_glob]
+    args += ["--", pattern]
     result = subprocess.run(args, cwd=repo_root, capture_output=True, text=True, timeout=10)
     if result.returncode not in (0, 1):
         raise RuntimeError(f"rg failed: {result.stderr.strip()}")
-    return result.stdout.strip() or "No matches found."
+    return _truncate(result.stdout.strip() or "No matches found.")
 
 
 def _grep_python(repo_root: Path, pattern: str, path_glob: str | None) -> str:
     regex = re.compile(pattern)
     matches: list[str] = []
+    repo_root_resolved = repo_root.resolve()
     for file_path in repo_root.glob(path_glob or "**/*"):
         if len(matches) >= 50:
             break
         if not file_path.is_file():
             continue
+        resolved = file_path.resolve()
+        if not resolved.is_relative_to(repo_root_resolved):
+            continue
         try:
-            text = file_path.read_text(encoding="utf-8", errors="replace")
+            text = resolved.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
         for i, line in enumerate(text.splitlines(), start=1):
@@ -162,7 +176,7 @@ def _grep_python(repo_root: Path, pattern: str, path_glob: str | None) -> str:
                 matches.append(f"{file_path.relative_to(repo_root)}:{i}:{line}")
                 if len(matches) >= 50:
                     break
-    return "\n".join(matches) if matches else "No matches found."
+    return _truncate("\n".join(matches) if matches else "No matches found.")
 
 
 def tool_list_symbols(ctx: ToolContext, path: str) -> str:
@@ -194,4 +208,5 @@ def tool_reindex(ctx: ToolContext) -> str:
 
     embed_provider = get_embedding_provider(ctx.config.embedding.provider, ctx.config.embedding.model)
     summary = run_indexing_pipeline(ctx.repo_root, ctx.index_name, ctx.config, embed_provider)
+    ctx.retriever = HybridRetriever.from_config(ctx.index_name, ctx.config)
     return f"Reindexed: {json.dumps(summary)}"
