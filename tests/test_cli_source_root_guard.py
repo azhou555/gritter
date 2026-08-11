@@ -41,7 +41,9 @@ def test_ask_cmd_handles_missing_source_root_gracefully(tmp_path):
          patch("gritter.cli.ask_cmd.HybridRetriever.from_config", return_value=Mock()), \
          patch("gritter.cli.ask_cmd.Path.cwd") as mock_cwd:
 
-        mock_cwd.return_value = Mock(name="test_index")
+        fake_cwd = Mock()
+        fake_cwd.name = "test_index"
+        mock_cwd.return_value = fake_cwd
 
         # Attempting to call ask should exit with code 1 due to missing source_root
         with pytest.raises(typer.Exit) as exc_info:
@@ -79,7 +81,9 @@ def test_chat_cmd_handles_missing_source_root_gracefully(tmp_path):
          patch("gritter.cli.chat_cmd.HybridRetriever.from_config", return_value=Mock()), \
          patch("gritter.cli.chat_cmd.Path.cwd") as mock_cwd:
 
-        mock_cwd.return_value = Mock(name="test_index")
+        fake_cwd = Mock()
+        fake_cwd.name = "test_index"
+        mock_cwd.return_value = fake_cwd
 
         # Attempting to call chat should exit with code 1 due to missing source_root
         with pytest.raises(typer.Exit) as exc_info:
