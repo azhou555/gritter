@@ -94,6 +94,17 @@ def test_session_verifies_citations_after_answering(tmp_path):
     assert ("fake.py:L1-5", False) in session.last_citations
 
 
+def test_session_does_not_append_empty_assistant_message(tmp_path):
+    """Minor fix: a turn that produces neither text nor a tool call must not
+    append an empty text block to history — some providers reject empty
+    text content on a later turn."""
+    llm = ScriptedLLMProvider([[Done()]])
+    session = AgentSession(llm, _make_ctx(tmp_path))
+    list(session.run("hi"))
+    assert all(m.content != "" for m in session.messages if m.role == "assistant")
+    assert len(session.messages) == 1  # only the user message
+
+
 def test_session_preserves_history_across_multiple_run_calls(tmp_path):
     llm = ScriptedLLMProvider([
         [TextDelta("first answer"), Done()],

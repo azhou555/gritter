@@ -54,7 +54,8 @@ class AgentSession:
             turn_text = "".join(text_chunks)
 
             if requested_call is None:
-                self.messages.append(Message(role="assistant", content=turn_text))
+                if turn_text:
+                    self.messages.append(Message(role="assistant", content=turn_text))
                 final_text = turn_text
                 break
 

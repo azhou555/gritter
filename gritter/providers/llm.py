@@ -58,26 +58,49 @@ class LLMProvider(ABC):
 # Message conversion helpers (provider-agnostic -> provider wire format)
 # ---------------------------------------------------------------------------
 
-def _messages_to_anthropic(messages: list[Message]) -> list[dict]:
+def _messages_to_anthropic(messages: list[Message], strip_tool_blocks: bool = False) -> list[dict]:
+    """Convert provider-agnostic messages into Anthropic wire format.
+
+    When `strip_tool_blocks` is True, prior tool_use/tool_result content is
+    rewritten as plain text blocks instead of Anthropic's structured
+    tool_use/tool_result types. This is used when sending a request with no
+    `tools` declared (e.g. the forced-final-answer turn after the tool-call
+    cap is hit) — carrying tool_use/tool_result blocks in history alongside
+    an empty `tools` list is a combination the Anthropic API may reject, so
+    we defensively downgrade that history to plain text regardless of the
+    exact validation rule.
+    """
     converted: list[dict] = []
     for m in messages:
         if m.role == "tool":
-            converted.append({
-                "role": "user",
-                "content": [{
-                    "type": "tool_result",
-                    "tool_use_id": m.tool_call_id,
-                    "content": m.content,
-                }],
-            })
+            if strip_tool_blocks:
+                converted.append({
+                    "role": "user",
+                    "content": [{"type": "text", "text": f"Tool result: {m.content}"}],
+                })
+            else:
+                converted.append({
+                    "role": "user",
+                    "content": [{
+                        "type": "tool_result",
+                        "tool_use_id": m.tool_call_id,
+                        "content": m.content,
+                    }],
+                })
         elif m.role == "assistant" and m.tool_calls:
             blocks: list[dict] = []
             if m.content:
                 blocks.append({"type": "text", "text": m.content})
             for tc in m.tool_calls:
-                blocks.append({
-                    "type": "tool_use", "id": tc.id, "name": tc.name, "input": tc.arguments,
-                })
+                if strip_tool_blocks:
+                    blocks.append({
+                        "type": "text",
+                        "text": f"I called `{tc.name}` with `{json.dumps(tc.arguments)}`",
+                    })
+                else:
+                    blocks.append({
+                        "type": "tool_use", "id": tc.id, "name": tc.name, "input": tc.arguments,
+                    })
             converted.append({"role": "assistant", "content": blocks})
         else:
             converted.append({"role": m.role, "content": m.content})
@@ -133,7 +156,7 @@ class ClaudeProvider(LLMProvider):
             "model": self._model,
             "max_tokens": 4096,
             "system": system,
-            "messages": _messages_to_anthropic(messages),
+            "messages": _messages_to_anthropic(messages, strip_tool_blocks=not tools),
         }
         if tools:
             kwargs["tools"] = [
@@ -210,6 +233,8 @@ def _run_openai_style_tools(
     pending_calls: dict[int, dict] = {}
 
     for chunk in response:
+        if not chunk.choices:
+            continue
         delta = chunk.choices[0].delta
         if delta.content:
             yield TextDelta(delta.content)
