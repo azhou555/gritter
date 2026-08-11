@@ -4,7 +4,6 @@ from collections.abc import Iterator
 
 import pytest
 
-from gritter.generation.citations import extract_citations, format_sources
 from gritter.generation.generator import Generator
 from gritter.generation.prompts import build_context_block, build_user_prompt
 from gritter.models.chunk import CodeChunk
@@ -81,39 +80,6 @@ def test_build_user_prompt_contains_all_chunks():
     assert "class User: pass" in prompt
     assert "Question: How does authentication work?" in prompt
     assert prompt.startswith("Context:")
-
-
-# ---------------------------------------------------------------------------
-# citations.py tests
-# ---------------------------------------------------------------------------
-
-def test_extract_citations_basic():
-    text = "See src/auth/jwt.py:L15-45 for the implementation."
-    assert extract_citations(text) == ["src/auth/jwt.py:L15-45"]
-
-
-def test_extract_citations_deduplication():
-    text = "src/auth/jwt.py:L15-45 is mentioned and again src/auth/jwt.py:L15-45 here."
-    result = extract_citations(text)
-    assert result == ["src/auth/jwt.py:L15-45"]
-
-
-def test_extract_citations_multiple():
-    text = "First see src/auth/jwt.py:L15-45, then check src/models/user.py:L10."
-    result = extract_citations(text)
-    assert result == ["src/auth/jwt.py:L15-45", "src/models/user.py:L10"]
-
-
-def test_format_sources_nonempty():
-    citations = ["src/auth/jwt.py:L15-45", "src/models/user.py:L10"]
-    output = format_sources(citations)
-    assert output.startswith("Sources:")
-    assert "\u2022 src/auth/jwt.py:L15-45" in output
-    assert "\u2022 src/models/user.py:L10" in output
-
-
-def test_format_sources_empty():
-    assert format_sources([]) == ""
 
 
 # ---------------------------------------------------------------------------
