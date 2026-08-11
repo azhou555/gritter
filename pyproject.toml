@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gritter"
-version = "0.1.0"
+version = "1.0.0"
 description = "Query any codebase with natural language using RAG"
 readme = "README.md"
 license = { text = "MIT" }
