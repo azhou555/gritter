@@ -82,27 +82,26 @@ def test_retrieval_returns_results(indexed_dir):
     assert results[0].chunk.file_path != ""
 
 
-def test_generation_returns_nonempty_response(indexed_dir):
-    """Generator should produce a non-empty streamed response with at least one citation."""
-    from gritter.generation.citations import extract_citations
-    from gritter.generation.generator import Generator
+def test_agent_session_returns_nonempty_response_with_citation(indexed_dir):
+    """AgentSession should produce a non-empty response with at least one verified citation."""
+    from gritter.agent.session import AgentSession
+    from gritter.agent.tools import ToolContext
     from gritter.models.config import GritterConfig
-    from gritter.providers.llm import get_llm_provider
+    from gritter.providers.llm import TextDelta, get_llm_provider
     from gritter.retrieval.hybrid import HybridRetriever
+    from gritter.storage.index_meta import IndexMeta
 
-    config, index_name, _ = indexed_dir
+    config, index_name, summary = indexed_dir
     retriever = HybridRetriever.from_config(index_name, config)
-    results = retriever.search("What does the add function do?")
+    source_root = IndexMeta(config.index_dir(index_name)).read()["source_root"]
 
     llm = get_llm_provider(config.llm.provider, config.llm.model)
-    gen = Generator(llm)
+    ctx = ToolContext(repo_root=Path(source_root), retriever=retriever, config=config, index_name=index_name)
+    session = AgentSession(llm, ctx)
 
-    tokens = list(gen.stream("What does the add function do?", results))
-    response = "".join(tokens)
+    events = list(session.run("What does the add function do?"))
+    response = "".join(e.text for e in events if isinstance(e, TextDelta))
 
     assert len(response) > 0, "Expected non-empty response"
-    assert len(gen.messages) == 2
-
-    # Response should cite at least one file
-    citations = extract_citations(response)
-    assert len(citations) >= 1, f"Expected at least one citation in: {response[:300]}"
+    assert len(session.messages) >= 2
+    assert len(session.last_citations) >= 1, f"Expected at least one citation in: {response[:300]}"

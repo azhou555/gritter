@@ -5,12 +5,13 @@ import typer
 from rich.live import Live
 from rich.text import Text
 
-from gritter.generation.citations import extract_citations, format_sources
-from gritter.generation.generator import Generator
+from gritter.agent.session import AgentSession, ToolFinished, ToolStarted
+from gritter.agent.tools import ToolContext
+from gritter.generation.citations import format_sources
 from gritter.models.config import GritterConfig
-from gritter.providers.embeddings import get_embedding_provider
-from gritter.providers.llm import get_llm_provider
+from gritter.providers.llm import TextDelta, get_llm_provider
 from gritter.retrieval.hybrid import HybridRetriever
+from gritter.storage.index_meta import IndexMeta
 from gritter.utils.display import console, print_error
 
 
@@ -27,6 +28,7 @@ def ask(
 
     try:
         retriever = HybridRetriever.from_config(index_name, config)
+        source_root = IndexMeta(config.index_dir(index_name)).read()["source_root"]
     except (ValueError, FileNotFoundError) as exc:
         print_error(str(exc))
         raise typer.Exit(1)
@@ -37,26 +39,21 @@ def ask(
         print_error(str(exc))
         raise typer.Exit(1)
 
-    results = retriever.search(question)
-    if not results:
-        print_error("No relevant code found. Try re-indexing or a different query.")
-        raise typer.Exit(1)
+    ctx = ToolContext(
+        repo_root=Path(source_root), retriever=retriever, config=config, index_name=index_name,
+    )
+    session = AgentSession(llm, ctx)
 
-    gen = Generator(llm)
     response_text = Text()
-
     console.print()
     with Live(response_text, console=console, refresh_per_second=15):
-        for token in gen.stream(question, results):
-            response_text.append(token)
-
+        for event in session.run(question):
+            if isinstance(event, TextDelta):
+                response_text.append(event.text)
+            elif isinstance(event, ToolStarted):
+                console.print(f"[dim]→ {event.name}({event.arguments})[/dim]")
     console.print()
 
-    # Extract and print citations
-    full_response = "".join(
-        m.content for m in gen.messages if m.role == "assistant"
-    )
-    citations = extract_citations(full_response)
-    sources = format_sources(citations)
+    sources = format_sources(session.last_citations)
     if sources:
         console.print(f"\n[dim]{sources}[/dim]")
