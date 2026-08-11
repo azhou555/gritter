@@ -112,3 +112,25 @@ def test_get_changed_files_multiple_statuses(tmp_path):
     assert tmp_path / "modified.py" in modified
     assert tmp_path / "added.rs" in modified
     assert tmp_path / "deleted.ts" in deleted
+
+
+# ---------------------------------------------------------------------------
+# IndexMeta
+# ---------------------------------------------------------------------------
+
+def test_index_meta_persists_source_root(tmp_path):
+    from gritter.storage.index_meta import IndexMeta
+
+    index_dir = tmp_path / "index"
+    meta = IndexMeta(index_dir)
+    meta.write(
+        embedding_provider="voyage",
+        embedding_model="voyage-code-3",
+        embedding_dimension=1024,
+        file_count=1,
+        chunk_count=1,
+        languages=["python"],
+        source_root="/repos/example",
+    )
+    reloaded = IndexMeta(index_dir).read()
+    assert reloaded["source_root"] == "/repos/example"

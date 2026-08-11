@@ -20,6 +20,7 @@ class IndexMeta:
         file_count: int,
         chunk_count: int,
         languages: list[str],
+        source_root: str,
         indexed_commit: str | None = None,
     ) -> None:
         self._data = {
@@ -29,6 +30,7 @@ class IndexMeta:
             "file_count": file_count,
             "chunk_count": chunk_count,
             "languages": sorted(languages),
+            "source_root": source_root,
             "indexed_at": datetime.now(timezone.utc).isoformat(),
             "indexed_commit": indexed_commit,
         }

@@ -135,6 +135,7 @@ def _run_full(
             file_count=len(file_pairs),
             chunk_count=len(all_chunks),
             languages=list(languages_seen),
+            source_root=str(root),
             indexed_commit=current_commit,
         )
 
@@ -180,6 +181,7 @@ def _run_incremental(
             file_count=stored["file_count"],
             chunk_count=stored["chunk_count"],
             languages=stored["languages"],
+            source_root=stored.get("source_root", str(root)),
             indexed_commit=current_commit,
         )
         return {
@@ -272,6 +274,7 @@ def _run_incremental(
             file_count=vector_store.count(),  # approximate via chunk count
             chunk_count=len(all_current_chunks),
             languages=all_languages,
+            source_root=stored_meta.get("source_root", str(root)),
             indexed_commit=current_commit,
         )
 
