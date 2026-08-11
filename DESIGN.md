@@ -54,6 +54,9 @@ typical RAG tooling.
 - Ollama reuses the OpenAI SDK pointed at a local `/v1` endpoint with a
   dummy API key instead of a dedicated client — avoids a fourth SDK
   dependency for a protocol-compatible target.
+- Ollama's default model changed from `llama3` to `llama3.1` in this
+  branch: agent mode requires a tool-calling-capable model, and `llama3`
+  doesn't support tool calls.
 - Each provider imports its SDK lazily in `__init__`, so installing Gritter
   doesn't require every embedding/LLM SDK to be present — only the one
   actually configured.
@@ -75,14 +78,16 @@ typical RAG tooling.
 
 - The system prompt hard-constrains the model to answer only from supplied
   context, cite as `path:Lstart-end`, and emit a fixed refusal string when
-  the answer isn't in context. This is a prompt-level anti-hallucination
-  guardrail, not a verified one.
-- **Known gap:** citation extraction (`generation/citations.py`) is a regex
-  pull from the model's own output text. It is never cross-checked against
-  the actual retrieved chunks' file paths/line ranges. A hallucinated but
-  correctly-formatted citation will pass through silently. Verifying
-  citations against retrieved chunk metadata is the natural next step if
-  citation trustworthiness becomes a priority.
+  the answer isn't in context. This prompt-level guardrail is backed by the
+  post-hoc verification described below, rather than being trusted alone.
+- Citation extraction (`generation/citations.py`) is still a regex pull from
+  the model's own output text, but it is now cross-checked post-hoc:
+  `verify_citations` resolves each cited `path:Lstart-end` against the real
+  file on disk (confined to `repo_root`) and confirms the line range is
+  in-bounds. Citations that don't verify aren't dropped — they're passed
+  through with an inline `[unverified]` marker (see `format_sources`) so
+  the caller can see the model cited something but the tool couldn't
+  confirm it against real files.
 
 ## Eval harness
 

@@ -84,11 +84,14 @@ gritter config set embedding.provider local
 
 # Use Ollama for LLM (no API key)
 gritter config set llm.provider ollama
-gritter config set llm.model llama3
+gritter config set llm.model llama3.1
 
 # Adjust retrieval
 gritter config set retrieval.top_k 10
 ```
+
+The default Ollama model is `llama3.1` (not `llama3`) — agent mode requires
+a tool-calling-capable model, which `llama3` does not support.
 
 Environment variable override format: `GRITTER_<SECTION>__<KEY>` (double underscore for nesting).
 
@@ -125,7 +128,13 @@ Three independent pipelines sharing a common data model:
 
 - **Indexing**: file discovery → language detection → AST/heuristic chunking → embedding → ChromaDB + BM25 storage
 - **Retrieval**: embed query → dense search (ChromaDB cosine) + sparse search (BM25) → reciprocal rank fusion → top-k
-- **Generation**: retrieval results → prompt construction → LLM streaming → citation parsing
+- **Generation (agentic)**: the LLM drives an agentic tool-calling loop rather
+  than following a fixed retrieve-then-generate pipeline. It decides when to
+  call `search_code`, `read_file`, `grep`, `list_symbols`, or `reindex` via
+  native tool-calling, looping up to 8 tool calls per turn before being
+  forced to produce a text-only answer. Citations in the final answer are
+  then verified against the real files/line-ranges on disk — not just
+  parsed and trusted — with unverified citations flagged `[unverified]`.
 
 The CLI layer is a thin orchestrator — no business logic.
 
