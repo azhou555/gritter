@@ -1,21 +1,117 @@
 from __future__ import annotations
+import json
 import os
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
 class Message:
-    role: str  # "user" or "assistant"
-    content: str
+    role: str  # "user", "assistant", or "tool"
+    content: str = ""
+    tool_calls: list["ToolCall"] = field(default_factory=list)  # only on assistant messages
+    tool_call_id: str | None = None  # only on role="tool" messages
+
+
+@dataclass
+class ToolSpec:
+    name: str
+    description: str
+    parameters: dict  # JSON schema for the arguments object
+
+
+@dataclass
+class ToolCall:
+    id: str
+    name: str
+    arguments: dict
+
+
+@dataclass
+class TextDelta:
+    text: str
+
+
+@dataclass
+class Done:
+    pass
+
+
+AgentEvent = TextDelta | ToolCall | Done
 
 
 class LLMProvider(ABC):
     @abstractmethod
-    def stream(self, system: str, messages: list[Message]) -> Iterator[str]:
-        """Stream response tokens for the given system prompt and message history."""
+    def run_tools(
+        self, system: str, messages: list[Message], tools: list[ToolSpec]
+    ) -> Iterator[AgentEvent]:
+        """Stream text and/or emit tool calls until the model is done.
 
+        Emits zero or more TextDelta events, then zero or more ToolCall
+        events (one per requested tool call), then exactly one Done event.
+        If `tools` is empty, the model must respond with text only.
+        """
+
+
+# ---------------------------------------------------------------------------
+# Message conversion helpers (provider-agnostic -> provider wire format)
+# ---------------------------------------------------------------------------
+
+def _messages_to_anthropic(messages: list[Message]) -> list[dict]:
+    converted: list[dict] = []
+    for m in messages:
+        if m.role == "tool":
+            converted.append({
+                "role": "user",
+                "content": [{
+                    "type": "tool_result",
+                    "tool_use_id": m.tool_call_id,
+                    "content": m.content,
+                }],
+            })
+        elif m.role == "assistant" and m.tool_calls:
+            blocks: list[dict] = []
+            if m.content:
+                blocks.append({"type": "text", "text": m.content})
+            for tc in m.tool_calls:
+                blocks.append({
+                    "type": "tool_use", "id": tc.id, "name": tc.name, "input": tc.arguments,
+                })
+            converted.append({"role": "assistant", "content": blocks})
+        else:
+            converted.append({"role": m.role, "content": m.content})
+    return converted
+
+
+def _messages_to_openai(messages: list[Message]) -> list[dict]:
+    converted: list[dict] = []
+    for m in messages:
+        if m.role == "tool":
+            converted.append({
+                "role": "tool", "tool_call_id": m.tool_call_id, "content": m.content,
+            })
+        elif m.role == "assistant" and m.tool_calls:
+            converted.append({
+                "role": "assistant",
+                "content": m.content or None,
+                "tool_calls": [
+                    {
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {"name": tc.name, "arguments": json.dumps(tc.arguments)},
+                    }
+                    for tc in m.tool_calls
+                ],
+            })
+        else:
+            converted.append({"role": m.role, "content": m.content})
+    return converted
+
+
+# ---------------------------------------------------------------------------
+# Providers
+# ---------------------------------------------------------------------------
 
 class ClaudeProvider(LLMProvider):
     """Anthropic Claude — default provider."""
@@ -30,15 +126,30 @@ class ClaudeProvider(LLMProvider):
         self._client = anthropic.Anthropic(api_key=api_key)
         self._model = model
 
-    def stream(self, system: str, messages: list[Message]) -> Iterator[str]:
-        with self._client.messages.stream(
-            model=self._model,
-            max_tokens=4096,
-            system=system,
-            messages=[{"role": m.role, "content": m.content} for m in messages],
-        ) as stream:
+    def run_tools(
+        self, system: str, messages: list[Message], tools: list[ToolSpec]
+    ) -> Iterator[AgentEvent]:
+        kwargs: dict = {
+            "model": self._model,
+            "max_tokens": 4096,
+            "system": system,
+            "messages": _messages_to_anthropic(messages),
+        }
+        if tools:
+            kwargs["tools"] = [
+                {"name": t.name, "description": t.description, "input_schema": t.parameters}
+                for t in tools
+            ]
+
+        with self._client.messages.stream(**kwargs) as stream:
             for text in stream.text_stream:
-                yield text
+                yield TextDelta(text)
+            final = stream.get_final_message()
+
+        for block in final.content:
+            if block.type == "tool_use":
+                yield ToolCall(id=block.id, name=block.name, arguments=block.input)
+        yield Done()
 
 
 class OpenAIProvider(LLMProvider):
@@ -54,38 +165,69 @@ class OpenAIProvider(LLMProvider):
         self._client = OpenAI(api_key=api_key)
         self._model = model
 
-    def stream(self, system: str, messages: list[Message]) -> Iterator[str]:
-        response = self._client.chat.completions.create(
-            model=self._model,
-            messages=[{"role": "system", "content": system}]
-            + [{"role": m.role, "content": m.content} for m in messages],
-            stream=True,
-        )
-        for chunk in response:
-            delta = chunk.choices[0].delta.content
-            if delta:
-                yield delta
+    def run_tools(
+        self, system: str, messages: list[Message], tools: list[ToolSpec]
+    ) -> Iterator[AgentEvent]:
+        yield from _run_openai_style_tools(self._client, self._model, system, messages, tools)
 
 
 class OllamaProvider(LLMProvider):
-    """Local Ollama — no API key required."""
+    """Local Ollama — no API key required. Requires a tool-calling-capable model
+    (e.g. llama3.1+); older/small models without tool-calling support will not
+    work in agent mode."""
 
-    def __init__(self, model: str = "llama3", base_url: str = "http://localhost:11434") -> None:
+    def __init__(self, model: str = "llama3.1", base_url: str = "http://localhost:11434") -> None:
         from openai import OpenAI
         self._client = OpenAI(base_url=f"{base_url}/v1", api_key="ollama")
         self._model = model
 
-    def stream(self, system: str, messages: list[Message]) -> Iterator[str]:
-        response = self._client.chat.completions.create(
-            model=self._model,
-            messages=[{"role": "system", "content": system}]
-            + [{"role": m.role, "content": m.content} for m in messages],
-            stream=True,
+    def run_tools(
+        self, system: str, messages: list[Message], tools: list[ToolSpec]
+    ) -> Iterator[AgentEvent]:
+        yield from _run_openai_style_tools(self._client, self._model, system, messages, tools)
+
+
+def _run_openai_style_tools(
+    client, model: str, system: str, messages: list[Message], tools: list[ToolSpec]
+) -> Iterator[AgentEvent]:
+    """Shared streaming + tool-call-accumulation logic for OpenAI and Ollama
+    (both speak the OpenAI-compatible chat completions API)."""
+    kwargs: dict = {
+        "model": model,
+        "messages": [{"role": "system", "content": system}] + _messages_to_openai(messages),
+        "stream": True,
+    }
+    if tools:
+        kwargs["tools"] = [
+            {
+                "type": "function",
+                "function": {"name": t.name, "description": t.description, "parameters": t.parameters},
+            }
+            for t in tools
+        ]
+
+    response = client.chat.completions.create(**kwargs)
+    pending_calls: dict[int, dict] = {}
+
+    for chunk in response:
+        delta = chunk.choices[0].delta
+        if delta.content:
+            yield TextDelta(delta.content)
+        if delta.tool_calls:
+            for tc_delta in delta.tool_calls:
+                entry = pending_calls.setdefault(tc_delta.index, {"id": None, "name": "", "arguments": ""})
+                if tc_delta.id:
+                    entry["id"] = tc_delta.id
+                if tc_delta.function and tc_delta.function.name:
+                    entry["name"] += tc_delta.function.name
+                if tc_delta.function and tc_delta.function.arguments:
+                    entry["arguments"] += tc_delta.function.arguments
+
+    for entry in pending_calls.values():
+        yield ToolCall(
+            id=entry["id"], name=entry["name"], arguments=json.loads(entry["arguments"] or "{}"),
         )
-        for chunk in response:
-            delta = chunk.choices[0].delta.content
-            if delta:
-                yield delta
+    yield Done()
 
 
 def get_llm_provider(
@@ -98,6 +240,6 @@ def get_llm_provider(
     elif provider == "openai":
         return OpenAIProvider(model or "gpt-4o")
     elif provider == "ollama":
-        return OllamaProvider(model or "llama3", base_url or "http://localhost:11434")
+        return OllamaProvider(model or "llama3.1", base_url or "http://localhost:11434")
     else:
         raise ValueError(f"Unknown LLM provider: {provider!r}")
