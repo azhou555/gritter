@@ -3,7 +3,7 @@
 ## Implementation plan
 
 1. Fetch the public PyPI Stats daily series for `gritter`, excluding known mirrors.
-2. Generate daily, 7-day, and rolling 30-day totals, plus the preceding 30-day total for comparison. Mark incomplete windows unavailable.
+2. Generate daily, 7-day, and rolling 30-day totals, plus the preceding 30-day total for comparison. Show recorded totals and day coverage for incomplete windows.
 3. Run daily and manually in GitHub Actions; display a summary and save Markdown, CSV, and raw JSON artifacts.
 4. Validate accounting and failures offline. Provide a separate SQL query for release-level analysis.
 
@@ -29,7 +29,7 @@ python3 scripts/download_report.py --input /tmp/gritter-download-report/source.j
 python3 -m unittest discover -s tests -p test_download_report.py
 ```
 
-The [PyPI Stats API](https://pypistats.org/api/) updates daily and retains 180 days of time series. Avoid fetching the endpoint more than once per day; use the saved response for reruns. API failures (including rate limits or a package with no available history) fail the job rather than recording zero downloads. Missing dates remain unavailable. Data more than three days old is flagged in the report.
+The [PyPI Stats API](https://pypistats.org/api/) updates daily and retains 180 days of time series. Avoid fetching the endpoint more than once per day; use the saved response for reruns. API failures (including rate limits or a package with no available history) fail the job rather than recording zero downloads. Incomplete windows show the sum of recorded downloads and day coverage, for example **20 recorded downloads · 14/30 days reported (incomplete)**. Missing dates are labeled **Not reported** and are not assumed to be zero; explicit zero entries count as reported days. Windows with no entries show **No data · 0/30 days reported**. Compare windows with different coverage cautiously. Data more than three days old is flagged in the report.
 
 These counts measure downloads, not unique users or successful installs. CI and repeated downloads contribute; caches and private mirrors affect counts. No analytics is added to the installed application.
 
