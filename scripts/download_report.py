@@ -33,10 +33,13 @@ def parse_history(payload: dict) -> dict[date, int]:
 
 def window_total(history: dict[date, int], end: date, days: int) -> str:
     dates = [end - timedelta(days=n) for n in range(days)]
-    missing = sum(day not in history for day in dates)
-    if missing:
-        return f"Unavailable ({missing} missing days)"
-    return f"{sum(history[day] for day in dates):,}"
+    reported = [history[day] for day in dates if day in history]
+    if not reported:
+        return f"No data · 0/{days} days reported"
+    total = sum(reported)
+    if len(reported) < days:
+        return f"{total:,} recorded downloads · {len(reported)}/{days} days reported (incomplete)"
+    return f"{total:,}"
 
 
 def render_report(history: dict[date, int], generated: datetime) -> str:
@@ -47,6 +50,9 @@ def render_report(history: dict[date, int], generated: datetime) -> str:
         "Source: [PyPI Stats](https://pypistats.org/project/gritter/). Known mirrors excluded.",
         "Counts measure downloads, not unique users or successful installations. CI and repeat downloads count; cached installs may not.", "",
         "Windows end on the latest source date; the month metric is a rolling 30 days.", "",
+        "Incomplete windows sum the reported days only; missing dates are not assumed to be zero. "
+        "Coverage counts dates returned by the source, including explicit zero counts. "
+        "Compare windows with different coverage cautiously.", "",
         "| Window | Downloads |", "| --- | ---: |",
     ]
     for label, days in [("Latest day", 1), ("Last 7 days", 7), ("Last 30 days", 30)]:
@@ -57,7 +63,7 @@ def render_report(history: dict[date, int], generated: datetime) -> str:
     lines.extend(["", "## Daily history (last 30 calendar days)", "", "| Date | Downloads |", "| --- | ---: |"])
     for offset in range(30):
         day = latest - timedelta(days=offset)
-        value = f"{history[day]:,}" if day in history else "Unavailable"
+        value = f"{history[day]:,}" if day in history else "Not reported"
         lines.append(f"| {day} | {value} |")
     lines.extend(["", "Full available history is in `downloads.csv`; the original response is in `source.json`.",
                   "Release-level counts require the separate BigQuery query in `docs/analytics/downloads-by-version.sql`.", ""])

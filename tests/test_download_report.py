@@ -39,13 +39,25 @@ class DownloadReportTests(unittest.TestCase):
         self.assertEqual(report.window_total(history, latest, 30), "465")
         self.assertEqual(report.window_total(history, latest - timedelta(days=30), 30), "1,365")
         del history[latest - timedelta(days=5)]
-        self.assertEqual(report.window_total(history, latest, 7), "Unavailable (1 missing days)")
+        self.assertEqual(report.window_total(history, latest, 7), "22 recorded downloads · 6/7 days reported (incomplete)")
+
+    def test_empty_window_is_not_zero(self):
+        latest = date(2026, 9, 29)
+        self.assertEqual(report.window_total({latest: 10}, latest - timedelta(days=1), 30),
+                         "No data · 0/30 days reported")
+
+    def test_explicit_zero_counts_as_reported(self):
+        latest = date(2026, 9, 29)
+        self.assertEqual(report.window_total({latest: 0}, latest, 1), "0")
+        self.assertEqual(report.window_total({latest: 0}, latest, 7),
+                         "0 recorded downloads · 1/7 days reported (incomplete)")
 
     def test_stale_data_is_visible(self):
         result = report.render_report({date(2026, 9, 20): 0}, datetime(2026, 9, 30, tzinfo=timezone.utc))
         self.assertIn("more than three days old", result)
         self.assertIn("Latest day | 0", result)
-        self.assertIn("Unavailable", result)
+        self.assertIn("Not reported", result)
+        self.assertIn("0 recorded downloads · 1/7 days reported (incomplete)", result)
 
     def test_offline_artifacts_and_summary(self):
         with tempfile.TemporaryDirectory() as tmp:
