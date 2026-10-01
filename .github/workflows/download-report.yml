@@ -1,0 +1,31 @@
+name: PyPI download report
+
+on:
+  schedule:
+    - cron: "23 14 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pypi-download-report
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Generate report
+        run: python scripts/download_report.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pypi-download-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: download-report/
+          if-no-files-found: error
+          retention-days: 90

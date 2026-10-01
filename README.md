@@ -167,3 +167,7 @@ End-to-end tests (requires API keys):
 ```bash
 GRITTER_RUN_E2E_TESTS=1 pytest tests/test_e2e.py -v
 ```
+
+## Download statistics
+
+The **PyPI download report** GitHub Actions workflow generates daily download totals and downloadable history. See [download tracking](docs/analytics/README.md) for reports, local usage, retention, and release-level analysis. These statistics measure downloads rather than unique installations.
